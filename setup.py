@@ -16,8 +16,7 @@ setup(
     install_requires=[
         "varnorm >= 0.2",
         "db2util >= 0.2",
-        "hgvs >= 0.8",
-        "pygr >= 0.8.2",
+        "plotly >= 1.4.9",
         "argparse >= 1.2.1"
     ]
 )
