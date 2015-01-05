@@ -5,7 +5,7 @@ from db2util.DatabaseParser import DatabaseParser
 
 def main():
     db = DatabaseParser(db="var_UK10K")
-    entries_of_interest = db.get("select vkey, sample, aac, gene, gene_id, ENST, effect, impact, exon_rank, LOF, NMD, level2, level3 from CHD_temp where pass = 1 and ((level1 is not NULL) or (level2 is not NULL and ((NMD is not NULL) or (LOF is not NULL) or (impact = 'HIGH'))))")
+    entries_of_interest = db.get("select vkey, sample, aac, gene, gene_id, ENST, effect, impact, exon_rank, LOF, NMD, level2, level3 from CHD_annot where pass = 1 and ((level1 is not NULL) or (level2 is not NULL and ((NMD is not NULL) or (LOF is not NULL) or (impact = 'HIGH') or (effect = 'NON_SYNONYMOUS_CODING'))) or (level3 is not NULL and ((NMD is not NULL) or (LOF is not NULL) or (impact = 'HIGH') or (effect = 'NON_SYNONYMOUS_CODING'))) or (level4 is not NULL and ((NMD is not NULL) or (LOF is not NULL) or (impact = 'HIGH') or (effect = 'NON_SYNONYMOUS_CODING')))  ) and ((1kgn_all < 0.05 and 1kgn_eur < 0.05) or (1kgn_all is NULL)) and ((uk10k_alspac < 0.05 and uk10k_twins < 0.05) or (uk10k_alspac is NULL or uk10k_twins is NULL)) and (wellderly < 0.05 or wellderly is NULL) ")
     variants = list(set(map(lambda x: x[0] , entries_of_interest)))
     samples = db.get("select distinct sample from CHD_genotype_vet")
     samples = map(lambda x: x[0], samples)

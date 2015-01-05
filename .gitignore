@@ -1,3 +1,7 @@
 build/
 env/
 files.txt
+*.pyc
+*.bkup
+varex.egg-info/
+dist/
