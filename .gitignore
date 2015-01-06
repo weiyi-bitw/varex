@@ -5,3 +5,4 @@ files.txt
 *.bkup
 varex.egg-info/
 dist/
+data/

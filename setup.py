@@ -7,7 +7,7 @@ setup(
     author_email='wei-yi.cheng@mssm.edu',
     packages=['varex', 'varex.commons'],
     include_package_data = True,
-    scripts=['bin/explainVCF', 'bin/createVarMatrix', 'bin/plotHeatmap'],
+    scripts=['bin/explainVCF', 'bin/createVarMatrix', 'bin/plotHeatmap', 'bin/elementize_vcf'],
     url='https://github.com/weiyi-bitw/varex',
     license='LICENSE.txt',
     description='Explain the causal variant of phenotype',
