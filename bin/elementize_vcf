@@ -6,7 +6,7 @@ import gzip
 import argparse
 import time
 import re
-from varnorm.VCFNormalization import VCFNormalization
+#from varnorm.VCFNormalization import VCFNormalization
 from varnorm.varcharkey import VarCharKey
 from varex.commons.VCFEntry import VCFEntry
 
@@ -14,12 +14,12 @@ def main(args):
     
     fi = gzip.open(args.inFile, 'rb') if args.inFile.endswith('gz') else open(args.inFile, "rb") 
     fo = open(args.outFile, "wb")
-    qq = VCFNormalization(
-                inFile = None,
-                genome = os.environ['HG19'],
-                vkey=True,
-                verbose=True
-            )
+    #qq = VCFNormalization(
+    #            inFile = None,
+    #            genome = os.environ['HG19'],
+    #            vkey=True,
+    #            verbose=True
+    #        )
     ssid = args.dataset
     idmap = None
     if args.id:
@@ -41,12 +41,13 @@ def main(args):
             alt = alts[a]
             [start_norm, end_norm, ref_norm, alt_norm] = [start, end, ref, alt]
 
-            if len(ref) > 1 or len(alt) > 1 or '.' in [ref, alt]:
-                [chrom, start_norm, end_norm, ref_norm, alt_norm] = qq.normAVar(chrom, start, end, ref, alt)
+            #if len(ref) > 1 or len(alt) > 1 or '.' in [ref, alt]:
+            #    [chrom, start_norm, end_norm, ref_norm, alt_norm] = qq.normAVar(chrom, start, end, ref, alt)
             if ref_norm == alt_norm:
                 continue
             vkey = VarCharKey.v2k(chrom, start_norm, end_norm, alt_norm)
-
+            if vkey == 'None' or not vkey:
+                continue
             qual = tokens[5] if tokens[5] != '.' else -1
             filt = tokens[6]
             infos = tokens[7]
@@ -75,7 +76,10 @@ def main(args):
                     elif f == 'DP' and v != '.':
                         dp = int(v)
                     elif f == 'AD' and '.' not in v:
-                        ad = int(v.split(',')[a+1])
+                        try:
+                            ad = int(v.split(',')[a+1])
+                        except IndexError:
+                            continue
                 if ac == 0 or not ac:
                     continue
                 print >> fo, VCFEntry(vkey, ssid, pid, ac, thisfilt, thisqual, gq, dp, ad)
