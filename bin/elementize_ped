@@ -1,0 +1,77 @@
+#!/usr/bin/env python
+
+import sys
+import os
+import gzip
+import argparse
+import time
+import re
+#from varnorm.VCFNormalization import VCFNormalization
+from varnorm.varcharkey import VarCharKey
+from varex.commons.VCFEntry import VCFEntry
+
+def countChars(s):
+    return dict(map(lambda x: (x, s.count(x)), set(s)))   
+
+
+def main(args):
+    
+    fi = gzip.open(args.inFile, 'rb') if args.inFile.endswith('gz') else open(args.inFile, "rb") 
+    fo = open(args.outFile, "wb")
+    
+    ssid = args.dataset
+    probemap = None
+    if args.probe:
+        idmap = {}
+        for l in open(args.probe, 'rb'):
+            tokens = l.strip().split('\t')
+            idmap[int(tokens[0])] = {'probe': tokens[1], 'chrom':tokens[2], 'pos': int(tokens[3]), 'ref': tokens[4]}
+    else:
+        print >> sys.stderr, "Must have probe id map file!! --probe argument"
+        raise
+
+    for l in fi:
+        if l.startswith('#'):
+            continue
+        tokens = l.strip().split(' ')
+        [famID, pid, paternID, maternID, sex, phenotype] = tokens[:6]
+        genotypes = tokens[6:]
+        genotypes = [genotypes[i] + genotypes[i+1] for i in range(0, len(genotypes), 2)]
+        for i in range(len(genotypes)):
+            ref = idmap[i]['ref']
+            if ref == 'NULL':
+                continue
+            alts = countChars(genotypes[i])
+            for a in alts:
+                if a == ref or a == '0':
+                    continue
+                chrom = idmap[i]['chrom']
+                pos = idmap[i]['pos']
+                vkey = VarCharKey.v2k(chrom, pos, pos + len(ref) - 1 , a)
+                if not vkey:
+                    continue
+                ac = alts[a]
+                print >> fo, VCFEntry(vkey, ssid, pid, ac)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser (description = __doc__, \
+            formatter_class = argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('inFile', metavar='INPUT_FILE', \
+            help="Input vcf file.")
+    parser.add_argument('outFile', metavar='OUTPUT_FILE', \
+            help="Output elementized vcf entries.")
+    parser.add_argument('-s', '--dataset', \
+            metavar='DATASET',
+            default='DATASET_' + str(round(time.time() * 1000)), \
+            help='Data set ID.')
+    parser.add_argument('--probe', \
+            metavar='PROBE_FILE',
+            default=None,
+            help='Map file link probe id to chrom, pos, ref'
+            )
+    args = parser.parse_args()
+    sys.exit(main(args))
+
+
+
