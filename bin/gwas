@@ -1,0 +1,213 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import getopt
+import re
+import gzip
+import argparse
+from varnorm.VCFNormalization import VCFNormalization
+from varnorm.varcharkey import VarCharKey
+
+
+def loadPhenoMatrix(file, assoc):
+    fi = open(file, 'rb')
+    pheno = {}
+    for line in fi:
+        if line.startswith('#'):
+            continue
+        tokens = line.strip().split('\t')
+        if assoc == "CT":
+            try:
+                pheno[tokens[0]] = map(lambda x: int(x) if x != 'NA' else None, tokens[1:])
+            except ValueError:
+                pheno[tokens[0]] = map(lambda x: int(float(x)) if x != 'NA' else None, tokens[1:])
+        elif assoc == "ANOVA":
+            pheno[tokens[0]] = map(lambda x: float(x) if x != 'NA' else None, tokens[1:])
+
+    return pheno
+
+def getCountTable(acnt, ph):
+    phXaa = filter(lambda x: x[0] != None and x[1] != None, zip(ph, acnt))
+    cntTable = dict( map(lambda x: (x, phXaa.count(x)), set(phXaa)) ) 
+    return cntTable
+
+def calcRSS(x):
+    if len(x) < 2:
+        return 0
+    else:
+        (x_sum, x_ss) = reduce(lambda a, b: (a[0]+b[0], a[1]+b[1]), map(lambda a: (a, a**2), x))
+        return x_ss - x_sum*x_sum/len(x)
+
+def getANOVAF(acnt, ph):
+    phXaa = filter(lambda x: x[0] != None and x[1] != None, zip(ph, acnt))
+    allAA = set(acnt)
+    groupedPh = map(lambda k: map(lambda z: z[0], filter(lambda x: x[1] == k , phXaa)) ,allAA)
+    rss_t = calcRSS(map(lambda x: x[0] , phXaa))
+    dof_t = len(phXaa) - 1
+    rss_wg = reduce(lambda a, b: a+b, map(lambda gp: calcRSS(gp) , groupedPh))
+    dof_wg = len(phXaa) - len(allAA)
+    rss_bg = rss_t - rss_wg
+    dof_bg = len(allAA) - 1
+    if dof_wg == 0 or dof_bg == 0:
+        return [None]*3
+    # calculating 
+    F = rss_bg * dof_wg / dof_bg / rss_wg
+    # return F, nominal dof, denom dof
+    return [F, dof_bg, dof_wg]
+
+def loadMask(file):
+    fi = open(file, 'rb')
+    mask = []
+    for line in fi:
+        if line.startswith('#'):
+            continue
+        tokens = line.strip().split('\t')
+        mask.extend(map(lambda x: int(x), tokens))
+    return mask
+
+#========================================
+#
+#  main function
+#
+#=======================================
+
+def main(args):
+    
+    fi = gzip.open(args.inFile, 'rb') if args.inFile.endswith('gz') else open(args.inFile, 'rb')
+    fileroot = args.inFile.split('.')[0]
+    fo = open(fileroot + ".gwasout", 'wb')
+
+    mask = None if not args.mask else loadMask(args.mask)
+    
+    refgenome = args.refgenome if args.normalize else None
+    
+    qq = None if not args.normalize else VCFNormalization(
+                inFile = None,
+                genome = refgenome,
+                vkey=True,
+                verbose=True
+            )
+
+    genType = "VCF" if not args.type else args.type
+
+    assoc = "ANOVA" if not args.assoc else args.assoc
+    
+    pheno = loadPhenoMatrix(args.pheno, assoc)
+    
+    print >> sys.stderr, """
+    infile: %s
+    pheno: %s
+    mask: %s
+    normalize: %s
+    refgenome: %s
+    type: %s
+    assoc: %s
+    """ % (args.inFile, args.pheno, str(args.mask), str(args.normalize), str(args.refgenome), genType, assoc )
+
+
+    allTuples = [(0,0), (0,1), (0,2), (1,0), (1,1), (1,2)]
+
+    for l in fi:
+        if l.startswith('#'):
+            continue
+        tokens = l.strip().split('\t')
+
+        if genType == "VCF":
+            chrom = tokens[0].replace('chr', '')
+            if chrom == 'X' or chrom == 'Y':
+                continue
+            pos = tokens[1]
+            start = int(pos)
+            
+            ref = tokens[3]
+            end = start + len(ref) - 1
+
+            alts = tokens[4].split(',')
+            fmt = tokens[8].split(':')
+            gt_idx = fmt.index("GT")
+            for a in range(1, len(alts)+1):
+                
+                gt = [x.split(':')[gt_idx] for x in tokens[9:]]
+                if mask != None:
+                    try:
+                        gt = [gt[x] for x in mask]
+                    except IndexError:
+                        print >> sys.stderr, "WARNING: IndexError while doing [gt[x] for x in mask]"
+                        continue
+
+                aacnt = [x.count(str(a)) if '.' not in x else None for x in gt]
+                alt = alts[a-1]
+                [start_norm, end_norm, ref_norm, alt_norm] = [start, end, ref, alt]
+                if args.normalize and (len(ref) > 1 or len(alt) > 1 or '.' in [ref, alt] or '-' in [ref, alt]):
+                    [chrom, start_norm, end_norm, ref_norm, alt_norm] = qq.normAVar(chrom, start, end, ref, alt)
+                vkey = VarCharKey.v2k(chrom, start_norm, end_norm, alt_norm)
+                if vkey == 'None' or not vkey:
+                    print >> sys.stderr, "WARNING: vkey is None for (%s, %s, %s, %s, %s)" % (chrom, str(start_norm), str(end_norm), str(ref_norm), str(alt_norm)) 
+                    continue
+                
+                for phName in pheno:
+                    if assoc == "CT":
+                        cntTable = getCountTable(aacnt, pheno[phName])
+                        print >> fo, "%s\t%s\t%s" % (phName , vkey , ",".join(['0' if x not in cntTable else str(cntTable[x]) for x in allTuples]) )
+                    elif assoc == "ANOVA":
+                        [F, dof_nom, dof_denom] = getANOVAF(aacnt, pheno[phName])
+                        if F == None:
+                            continue
+                        print >> fo, "%s\t%s\t%s" % (phName , vkey, ",".join([F, dof_nom, dof_denom]))
+
+        elif genType == "AA":
+            vkey = tokens[0]
+            aacnt = [None if x == 'NA' else int(x) for x in tokens[1:]]
+            if mask != None:
+                aacnt = [aacnt[x] for x in mask]
+            
+            for phName in pheno:
+                if assoc == "CT":
+                    cntTable = getCountTable(aacnt, pheno[phName])
+                    print >> fo, "%s\t%s\t%s" % (phName , vkey , ",".join(['0' if x not in cntTable else str(cntTable[x]) for x in allTuples ]) )
+                elif assoc == "ANOVA":
+                    [F, dof_nom, dof_denom] = getANOVAF(aacnt, pheno[phName])
+                    if F == None:
+                        continue
+                    print >> fo, "%s\t%s\t%s" % (phName , vkey, ",".join(map(lambda x: str(x), [F, dof_nom, dof_denom])) )
+        fo.close()
+        fi.close()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser (description = __doc__, 
+            formatter_class = argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('inFile', metavar='INPUT_FILE', 
+            help="Input vcf/gen file.")
+    parser.add_argument('pheno', metavar='PHENOTYPE_FILE', 
+            help="Phenotype file.")
+    parser.add_argument('-m', '--mask', 
+            metavar='MASK_FILE',
+            default=None, 
+            help='mask file filtering samples.')
+    parser.add_argument('-t', '--type', 
+            metavar='FILE_TYPE',
+            default="VCF",
+            help='Input file type'
+            )
+    parser.add_argument('-a', '--assoc', 
+            metavar='ASSOCIATION',
+            default="ANOVA",
+            help='Association measure'
+            )
+    parser.add_argument('--normalize', 
+            default=False,
+            action='store_true',
+            help='Whether to perform normalization'
+            )
+    parser.add_argument('--refgenome', 
+            metavar='REF_GENOME',
+            default=os.environ['HG19'],
+            help='Reference genome for normalization'
+            )
+
+    args = parser.parse_args()
+    sys.exit(main(args))
+
+
