@@ -1,0 +1,88 @@
+#!/usr/bin/env python
+
+import argparse
+import sys
+from scipy.stats import hypergeom
+
+
+def calcOR(M, n, N, c):
+    t0_0 = M - n - N + c
+    t0_1 = n - c
+    t1_0 = N - c
+    t1_1 = c
+    if t0_0 == 0 or t1_1 == 0:
+        OR = (t0_0+0.1) * (t1_1 + 0.1) / (t0_1 + 0.1) / (t1_0 + 0.1) 
+        return [OR, "<"]
+    if t1_0 == 0 or t0_1 == 0:
+        OR = (t0_0+0.1) * (t1_1 + 0.1) / (t0_1 + 0.1) / (t1_0 + 0.1) 
+        return [OR, ">"]
+    OR = float(t0_0) * (t1_1) / (t0_1) / (t1_0)
+    return [OR, " "]
+
+def main(args):
+    fi = open(args.inFile, 'rb')
+    outfile = args.inFile.split('.')[0]
+    fo = open(outfile + ".hypergeo.out", "wb")
+    pth = float(args.threshold)
+    for l in fi:
+        tokens = l.strip().split('\t')
+        [disease, variant] = tokens[:2]
+        counts = [int(x) for x in tokens[2].split(",")]
+
+        #AC model
+        [M, n, N] = [sum(counts)*2, counts[1] + 2*counts[2] + counts[4] + 2*counts[5], sum(counts[3:])*2]
+        hp = hypergeom(M, n, N)
+        c = counts[4] + 2*counts[5]
+        [OR, OR_estimate] = calcOR(M, n, N, c)
+        p_protective = hp.cdf(c)
+        p_inducing = 1 - hp.cdf(c-1)
+        if p_protective != p_protective or p_inducing != p_inducing:
+            pass
+        elif p_protective < p_inducing and p_protective < pth:
+            print >> fo, '\t'.join([disease, variant, "AC", '\t'.join([str(x) for x in counts]), str(p_protective), str(OR), OR_estimate])
+        elif p_inducing < p_protective and p_inducing < pth:
+            print >> fo, '\t'.join([disease, variant, "AC", '\t'.join([str(x) for x in counts]), str(p_inducing), str(OR), OR_estimate])
+
+        #AD model
+        [M, n, N] = [sum(counts), counts[1] + counts[2] + counts[4] + counts[5], sum(counts[3:])]
+        hp = hypergeom(M, n, N)
+        c = counts[4] + counts[5]
+        [OR, OR_estimate] = calcOR(M, n, N, c)
+        p_protective = hp.cdf(c)
+        p_inducing = 1 - hp.cdf(c-1)
+        if p_protective != p_protective or p_inducing != p_inducing:
+            pass
+        elif p_protective < p_inducing and p_protective < pth:
+            print >> fo, '\t'.join([disease, variant, "AD", '\t'.join([str(x) for x in counts]), str(p_protective), str(OR), OR_estimate])
+        elif p_inducing < p_protective and p_inducing < pth:
+            print >> fo, '\t'.join([disease, variant, "AD", '\t'.join([str(x) for x in counts]), str(p_inducing), str(OR), OR_estimate])
+
+        #AR model
+        [M, n, N] = [sum(counts), counts[2] + counts[5], sum(counts[3:])]
+        hp = hypergeom(M, n, N)
+        c = counts[5]
+        [OR, OR_estimate] = calcOR(M, n, N, c)
+        p_protective = hp.cdf(c)
+        p_inducing = 1 - hp.cdf(c-1)
+        if p_protective != p_protective or p_inducing != p_inducing:
+            pass
+        elif p_protective < p_inducing and p_protective < pth:
+            print >> fo, '\t'.join([disease, variant, "AR", '\t'.join([str(x) for x in counts]), str(p_protective), str(OR), OR_estimate])
+        elif p_inducing < p_protective and p_inducing < pth:
+            print >> fo, '\t'.join([disease, variant, "AR", '\t'.join([str(x) for x in counts]), str(p_inducing), str(OR), OR_estimate])
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser (description = __doc__, 
+            formatter_class = argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('inFile', metavar='INPUT_FILE', 
+            help="Input gwasout files")
+    parser.add_argument('-t', '--threshold', 
+            metavar='P',
+            default=1, 
+            help='P value threshold')
+
+    args = parser.parse_args()
+    sys.exit(main(args))
+
+
+

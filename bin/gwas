@@ -6,7 +6,6 @@ import getopt
 import re
 import gzip
 import argparse
-from varnorm.VCFNormalization import VCFNormalization
 from varnorm.varcharkey import VarCharKey
 
 
@@ -82,6 +81,9 @@ def main(args):
     
     refgenome = args.refgenome if args.normalize else None
     
+    if args.normalize:
+        from varnorm.VCFNormalization import VCFNormalization
+    
     qq = None if not args.normalize else VCFNormalization(
                 inFile = None,
                 genome = refgenome,
@@ -140,7 +142,12 @@ def main(args):
                 alt = alts[a-1]
                 [start_norm, end_norm, ref_norm, alt_norm] = [start, end, ref, alt]
                 if args.normalize and (len(ref) > 1 or len(alt) > 1 or '.' in [ref, alt] or '-' in [ref, alt]):
-                    [chrom, start_norm, end_norm, ref_norm, alt_norm] = qq.normAVar(chrom, start, end, ref, alt)
+                    try:
+                        [chrom, start_norm, end_norm, ref_norm, alt_norm] = qq.normAVar(chrom, start, end, ref, alt)
+                    except:
+                        print >> sys.stderr, "WARNING: normalization failed for (%s, %s, %s, %s, %s)" % (chrom, str(start_norm), str(end_norm), str(ref_norm), str(alt_norm))
+                        continue
+
                 vkey = VarCharKey.v2k(chrom, start_norm, end_norm, alt_norm)
                 if vkey == 'None' or not vkey:
                     print >> sys.stderr, "WARNING: vkey is None for (%s, %s, %s, %s, %s)" % (chrom, str(start_norm), str(end_norm), str(ref_norm), str(alt_norm)) 
@@ -171,8 +178,8 @@ def main(args):
                     if F == None:
                         continue
                     print >> fo, "%s\t%s\t%s" % (phName , vkey, ",".join(map(lambda x: str(x), [F, dof_nom, dof_denom])) )
-        fo.close()
-        fi.close()
+    fo.close()
+    fi.close()
 
 
 if __name__ == "__main__":
