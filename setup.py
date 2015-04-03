@@ -7,14 +7,14 @@ setup(
     author_email='wei-yi.cheng@mssm.edu',
     packages=['varex', 'varex.commons'],
     include_package_data = True,
-    scripts=['bin/explainVCF', 
-        'bin/createVarMatrix', 
-        'bin/plotHeatmap', 
+    scripts=['bin/explain_vcf', 
+        'bin/create_var_matrix', 
         'bin/elementize_vcf', 
         'bin/elementize_ped',
         'bin/gwas',
         'bin/gwas_hypergeo',
-        'bin/normGWASout'],
+        'bin/normalize_gwas_out',
+        'bin/reinstall'],
     url='https://github.com/weiyi-bitw/varex',
     license='LICENSE.txt',
     description='Explain the causal variant of phenotype',
@@ -26,7 +26,6 @@ setup(
         "varnorm >= 0.2",
         "db2util >= 0.2",
         "MySQL-python >= 1.2.5",
-        "plotly >= 1.4.9",
         "argparse >= 1.2.1"
     ]
 )

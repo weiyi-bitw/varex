@@ -6,6 +6,7 @@ import getopt
 import re
 import gzip
 import argparse
+import textwrap
 from varnorm.varcharkey import VarCharKey
 
 
@@ -186,32 +187,38 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser (description = __doc__, 
             formatter_class = argparse.RawDescriptionHelpFormatter)
     parser.add_argument('inFile', metavar='INPUT_FILE', 
-            help="Input vcf/gen file.")
+            help="Input vcf/aac file.")
     parser.add_argument('pheno', metavar='PHENOTYPE_FILE', 
             help="Phenotype file.")
     parser.add_argument('-m', '--mask', 
             metavar='MASK_FILE',
             default=None, 
-            help='mask file filtering samples.')
+            help='Optional mask file filtering samples.')
     parser.add_argument('-t', '--type', 
             metavar='FILE_TYPE',
-            default="VCF",
-            help='Input file type'
-            )
+            default='VCF',
+            help=textwrap.dedent('''\
+            Input file type (DEFAULT: VCF):
+               VCF=vcf file;
+               AA=alternate allele count
+            '''))
     parser.add_argument('-a', '--assoc', 
             metavar='ASSOCIATION',
-            default="ANOVA",
-            help='Association measure'
-            )
+            default='ANOVA',
+            help=textwrap.dedent('''\
+            Association measure (DEFAULT: ANOVA):
+               ANOVA=ANOVA-F;
+               CT=Count table (for chi-square or hypergeometric test)
+            '''))
     parser.add_argument('--normalize', 
             default=False,
             action='store_true',
-            help='Whether to perform normalization'
+            help='Whether to perform normalization (DEFAULT: False)'
             )
     parser.add_argument('--refgenome', 
             metavar='REF_GENOME',
             default=os.environ['HG19'],
-            help='Reference genome for normalization'
+            help='Reference genome for normalization (DEFAULT: env variable $HG19)'
             )
 
     args = parser.parse_args()
