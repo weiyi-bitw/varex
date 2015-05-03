@@ -1,0 +1,156 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import re
+import gzip
+import argparse
+import textwrap
+from varnorm.varcharkey import VarCharKey
+from varnorm.VCFNormalization import VCFNormalization
+
+def calc_freq(mask, gtIn, a):
+    if not mask:
+        gt = gtIn
+    else:
+        gt = [gtIn[i] for i in mask]
+    
+    aac = [t.count(a) for t in gt]
+    aacnt = sum(aac)
+    total_ac = sum(map(lambda t: len(t), gt))
+    af = float(aacnt) / total_ac
+    
+    total_gt = map(lambda x: len(x), gt).count(2)
+    homo_alt_gt = gt.count(a*2)
+    homo_alt_gtf = float(homo_alt_gt) / total_gt
+    het_gt = aac.count(1)
+    het_gtf = float(het_gt) / total_gt
+
+    return [total_ac, aacnt, af, total_gt, homo_alt_gt, homo_alt_gtf, het_gt, het_gtf]
+    
+
+def loadMask(file):
+    fi = open(file, 'rb')
+    mask = {'ALL':None}
+    for line in fi:
+        if line.startswith('#'):
+            continue
+        tokens = line.strip().split('\t')
+        mask.extend(map(lambda x: int(x), tokens))
+    return mask
+
+#========================================
+#
+#  main function
+#
+#=======================================
+
+def main(args):
+
+    genome = args.refgenome
+    mask = None if not args.mask else loadMask(args.mask)
+
+    fi = gzip.open(args.inFile, 'rb') if args.inFile.endswith('gz') else open(args.inFile, 'rb')
+    fileroot = args.inFile.split('.')[0]
+    fo = open(fileroot + ".aacout", 'wb')
+    
+    if args.normalize:
+        from varnorm.VCFNormalization import VCFNormalization
+    
+    vcfn = None if not args.normalize else VCFNormalization(
+                inFile = None,
+                genome = genome,
+                vkey=True,
+                verbose=True
+            )
+    
+    for l in fi:
+        if l.startswith('#'):
+            continue
+        tokens = l.strip().split('\t')
+        
+        chrom = tokens[0].replace('chr', '')
+        pos = tokens[1]
+
+        vid = tokens[2] if tokens[2] != '.' else '\N'
+        ref = tokens[3]
+        qual = tokens[5]
+        filt = tokens[6]
+
+        start = int(pos)
+        end = start + len(ref) - 1
+        
+        alts = tokens[4].split(',')
+        fmt = tokens[8].split(':')
+        gt_idx = fmt.index("GT")
+
+        for a in range(len(alts)):
+            
+            gt = map(lambda x: x.split(':')[gt_idx] , tokens[9:])
+            gt = map(lambda x: re.sub('/|\||\.', '', x), gt)
+
+            alt = alts[a]
+            
+            start_norm = start
+            end_norm = end
+            ref_norm = ref
+            alt_norm = alt
+            
+            if args.normalize and (len(ref) > 1 or len(alt) > 1 or ref == '.' or alt == '.' or ref == '-' or alt == '-'):
+                chrom, start_norm, end_norm, ref_norm, alt_norm = vcfn.normAVar(chrom, start, end, ref, alt)
+            
+            vkey = VarCharKey.v2k(chrom, start_norm, end_norm, alt_norm)
+            if not mask:
+                freqs = calc_freq(None, gt, str(a+1))
+                outline = [vkey, args.source, args.dataset, args.population, args.phenotype ]
+                print >> fo, '\t'.join([str(x) for x in outline  + freqs])
+            else:
+                for m in mask:
+                    freqs = calc_freq(mask[m], gt, str(a+1))
+                    outline = [vkey, args.source, args.dataset, args.population, args.phenotype ]
+                    print >> fo, '\t'.join([str(x) for x in outline  + freqs])
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser (description = __doc__, 
+            formatter_class = argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('inFile', metavar='INPUT_FILE', 
+            help="Input vcf file.")
+    parser.add_argument('-m', '--mask', 
+            metavar='MASK_FILE',
+            default=None, 
+            help='Optional mask file filtering samples.')
+    parser.add_argument('--normalize', 
+            default=False,
+            action='store_true',
+            help='Whether to perform normalization (DEFAULT: False)'
+            )
+    parser.add_argument('--refgenome', 
+            metavar='REF_GENOME',
+            default=os.environ['HG19'],
+            help='Reference genome for normalization (DEFAULT: env variable $HG19)'
+            )
+    parser.add_argument('--source', 
+            metavar='DATA_SOURCE',
+            default="UNKNOWN_SOURCE",
+            help='Data source ID (DEFAULT: UNKNOWN_SOURCE)'
+            )
+    parser.add_argument('--dataset', 
+            metavar='DATA_SET',
+            default="UNKNOWN_SET",
+            help='Dataset ID (DEFAULT: UNKNOWN_SET)'
+            )
+    parser.add_argument('--population', 
+            metavar='POPULATION',
+            default="UNKNOWN",
+            help='Population ID (DEFAULT: UNKNOWN)'
+            )
+    parser.add_argument('--phenotype', 
+            metavar='PHENOTYPE',
+            default="UNKNOWN_PHENOTYPE",
+            help='Phenotype ID (DEFAULT: UNKNOWN_PHENOTYPE)'
+            )
+
+    args = parser.parse_args()
+    sys.exit(main(args))
+
+

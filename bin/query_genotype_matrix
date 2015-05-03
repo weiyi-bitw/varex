@@ -1,0 +1,103 @@
+#!/usr/bin/env python
+
+"""
+ *
+ * DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+ *
+ * Version 2, December 2004
+ *
+ * Copyright (C) 2015 Wei-Yi Cheng [ninpy.weiyi@gmail.com]
+ *
+ * Everyone is permitted to copy and distribute verbatim or modified 
+ * copies of this license document, and changing it is allowed as long 
+ * as the name is changed.
+ *
+ * DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE TERMS AND CONDITIONS FOR 
+ * COPYING, DISTRIBUTION AND MODIFICATION
+ *
+ * 0. You just DO WHAT THE FUCK YOU WANT TO.
+ *
+"""
+
+import sys
+import os
+import argparse
+import subprocess
+
+def main(args):
+    qq = VCFNormalization(
+                inFile = args.inFile,
+                genome = args.reference,
+                vkey=(not args.novkey),
+                verbose=args.verbose
+            )
+    if type(args.output) is str:
+        out_file_token = args.output.split("/")
+        dirs_to_create = '/'.join(out_file_token[:(len(out_file_token)-1)])
+        if dirs_to_create and not os.path.exists(dirs_to_create):
+          os.makedirs(dirs_to_create)
+
+    fo = open(args.output, 'wb') if type(args.output) is str else sys.stdout
+    qq.run(fo, args.sample)
+    if fo != sys.stdout:
+        fo.close()
+       
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser (description = __doc__, \
+            formatter_class = argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('in_file', metavar='INPUT_FILE', \
+            help="Input vcf file list for query.")
+    parser.add_argument('pos_file', metavar='POS_FILE', \
+            help="List of positions to query.")
+    parser.add_argument('-o', '--output', metavar='OUTPUT_FILE', \
+            default=sys.stdout, \
+            help='Output file. Default: stdout')
+    parser.add_argument('--reference', metavar='REF_GENOME', \
+            default=os.environ['HG19'], \
+            help='Path to reference genome .fa file. Default: $HG19 ' +  
+                'environmental variable.')
+    parser.add_argument('-v', '--verbose', \
+            action='store_true', \
+            default=False, \
+            help='Run in verbose mode.')
+    parser.add_argument('--usevkey', \
+            action='store_true', \
+            default=False, \
+            help='Use vkey to represent the variant, otherwise use chr_pos_ref_alt')
+    args = parser.parse_args()
+    sys.exit(main(args))
+
+
+"""
+# loading dbsnp to loci map
+loci_map = {}
+with open("queried_dbsnp.txt", "rb") as fi:
+    for l in fi:
+        tokens = l.strip().split('\t')
+        dbsnp = tokens[0]
+        loci = tokens[1]
+        loci = loci.split('-')[0]
+        loci_map[loci] = dbsnp
+
+# parsing genotype file
+genotype = {}
+with open("queried_genotype.txt", "rb") as fi:
+    for l in fi:
+        tokens = l.strip().split('\t')
+        dbsnp = loci_map[tokens[0]]
+        gt = tokens[2:]
+        for g in gt:
+            [sample, individual_gt] = g.split('=')
+            individual_gt = individual_gt.replace('/', '')
+            if sample not in genotype:
+                genotype[sample] = {}
+            genotype[sample][dbsnp] = individual_gt
+
+# output genotype as matrix
+with open("genotype_matrix.txt", "wb") as fo:
+    print >> fo, '\t'.join(["#sample_id"] + [loci_map[l] for l in loci_map])
+    for s in genotype:
+        print >> fo, '\t'.join([s] + [genotype[s][loci_map[l]] for l in loci_map])
+
+"""

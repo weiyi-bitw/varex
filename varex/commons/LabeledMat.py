@@ -2,7 +2,7 @@ import sys
 import numpy as np
 import copy
 import time
-from sklearn.preprocessing import PolynomialFeatures
+#from sklearn.preprocessing import PolynomialFeatures
 
 class LabeledMat(object):
     """

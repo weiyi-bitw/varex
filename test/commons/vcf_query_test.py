@@ -1,3 +1,4 @@
+"""
 The MIT License (MIT) for varex package
 
 Copyright (c) 2015 Wei-Yi Cheng
@@ -19,4 +20,31 @@ FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+"""
+
+import unittest
+import varex.commons.vcf_query as vcfq
+
+class VcfQueryTestCase(unittest.TestCase):
+    """
+    Base TestCase class for testing varex.commons.vcf_query
+    """
+    def setUp(self):
+        self.pos_file = "test/resources/test_positions.txt"
+        self.vcf_file = "test/resources/test_vcf.vcf.gz"
+
+class PositionsTestCase(VcfQueryTestCase):
+    """
+    Test the vcf_query.load_position function
+    """
+    def runTest(self):
+        pos = vcfq.load_positions(self.pos_file)
+        self.assertEqual(pos[0], ['1', '10506', '10506'], 
+            "pos[0] was not load correctly!")
+        self.assertEqual(pos[1], ['1', '15274', '15274'],
+            "pos[1] was not load correctly!")
+
+
+if __name__ == '__main__':
+    unittest.main()
 

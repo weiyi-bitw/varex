@@ -1,0 +1,2 @@
+test/resources/test_vcf_1.vcf.gz
+test/resources/test_vcf_2.vcf.gz
