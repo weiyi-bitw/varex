@@ -93,6 +93,7 @@ class VcfExtractor(object):
                       #print >> self.log, "current directory: %s"%(os.getcwd())
                       print >> self.log, "    Querying position %s ..."%(q)
                   subprocess.call(["vcf-query", vf, q], stdout=fo)
+      return out_file
 
   def query_out_to_matrix(self, query_out_file):
       """
@@ -139,5 +140,5 @@ class VcfExtractor(object):
                    if s in self.genotypes[v] else "NA" \
                    for s in final_samples]
               print >> fo, v + "\t" + "\t".join(t)
-
+      return out_file
 
